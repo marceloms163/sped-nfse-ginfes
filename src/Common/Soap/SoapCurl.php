@@ -32,7 +32,7 @@ class SoapCurl extends SoapBase implements SoapInterface
     {
         parent::__construct($certificate, $logger);
     }
-    
+
     /**
      * Send soap message to url
      * @param string $operation
@@ -53,7 +53,7 @@ class SoapCurl extends SoapBase implements SoapInterface
         $response = '';
         $this->requestHead = implode("\n", $parameters);
         $this->requestBody = $envelope;
-        
+
         try {
             $this->saveTemporarilyKeyFiles();
             $oCurl = curl_init();
@@ -67,7 +67,7 @@ class SoapCurl extends SoapBase implements SoapInterface
             curl_setopt($oCurl, CURLOPT_SSL_VERIFYPEER, 0);
             if (!$this->disablesec) {
                 curl_setopt($oCurl, CURLOPT_SSL_VERIFYHOST, 2);
-                if (is_file($this->casefaz)) {
+                if (is_file((string) $this->casefaz)) {
                     curl_setopt($oCurl, CURLOPT_CAINFO, $this->casefaz);
                 }
             }
@@ -112,13 +112,13 @@ class SoapCurl extends SoapBase implements SoapInterface
         if ($httpcode != 200) {
             throw SoapException::soapFault(
                 " [$url] HTTP Error code: $httpcode - "
-                . $this->getFaultString($this->responseBody),
+                    . $this->getFaultString($this->responseBody),
                 $httpcode
             );
         }
         return $this->responseBody;
     }
-    
+
     /**
      * Recover WSDL form given URL
      * @param string $url
@@ -154,7 +154,7 @@ class SoapCurl extends SoapBase implements SoapInterface
         }
         return $response;
     }
-    
+
     /**
      * Set proxy into cURL parameters
      * @param resource $oCurl
@@ -164,14 +164,14 @@ class SoapCurl extends SoapBase implements SoapInterface
         if ($this->proxyIP != '') {
             curl_setopt($oCurl, CURLOPT_HTTPPROXYTUNNEL, 1);
             curl_setopt($oCurl, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
-            curl_setopt($oCurl, CURLOPT_PROXY, $this->proxyIP.':'.$this->proxyPort);
+            curl_setopt($oCurl, CURLOPT_PROXY, $this->proxyIP . ':' . $this->proxyPort);
             if ($this->proxyUser != '') {
-                curl_setopt($oCurl, CURLOPT_PROXYUSERPWD, $this->proxyUser.':'.$this->proxyPass);
+                curl_setopt($oCurl, CURLOPT_PROXYUSERPWD, $this->proxyUser . ':' . $this->proxyPass);
                 curl_setopt($oCurl, CURLOPT_PROXYAUTH, CURLAUTH_BASIC);
             }
         }
     }
-    
+
     /**
      * Extract faultstring form response if exists
      * @param string $body
