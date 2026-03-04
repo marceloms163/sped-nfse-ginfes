@@ -60,13 +60,14 @@ class Rps implements RpsInterface
     /**
      * {@inheritdoc}
      */
-    public function render(stdClass $rps = null)
+    public function render(stdClass $rps = null, array $options = [])
     {
         $this->init($rps);
         $fac = new Factory($this->std);
         if (!empty($this->config)) {
             $fac->addConfig($this->config);
         }
+        $fac->setOptions($options);
         return $fac->render();
     }
     

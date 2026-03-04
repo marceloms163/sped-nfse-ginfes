@@ -24,6 +24,8 @@ class Tools extends BaseTools
 {
     const ERRO_EMISSAO = 1;
     const SERVICO_NAO_CONCLUIDO = 2;
+    const LAYOUT_LEGACY = 'legacy';
+    const LAYOUT_IBSCBS = 'ibscbs';
 
     protected $xsdpath;
 
@@ -40,12 +42,14 @@ class Tools extends BaseTools
      * Envia LOTE de RPS para emissão de NFSe (ASSINCRONO)
      * @param array $arps Array contendo de 1 a 50 RPS::class
      * @param string $lote Número do lote de envio
+     * @param string $layout legacy|ibscbs
      * @return string
      * @throws \Exception
      */
-    public function recepcionarLoteRps($arps, $lote)
+    public function recepcionarLoteRps($arps, $lote, $layout = self::LAYOUT_LEGACY)
     {
         $operation = 'RecepcionarLoteRpsV3';
+        $layout = $this->normalizeLayout($layout);
         $no_of_rps_in_lot = count($arps);
         if ($no_of_rps_in_lot > 50) {
             throw new \Exception('O limite é de 50 RPS por lote enviado.');
@@ -53,7 +57,7 @@ class Tools extends BaseTools
         $content = '';
         foreach ($arps as $rps) {
             $rps->config($this->config);
-            $content .= $rps->render();
+            $content .= $rps->render(null, ['layout' => $layout]);
         }
         $contentmsg = "<EnviarLoteRpsEnvio xmlns=\"http://www.ginfes.com.br/servico_enviar_lote_rps_envio_v03.xsd\">"
             . "<LoteRps Id=\"$lote\" xmlns:tipos=\"http://www.ginfes.com.br/tipos_v03.xsd\">"
@@ -77,8 +81,33 @@ class Tools extends BaseTools
             'EnviarLoteRpsEnvio'
         );
         $content = str_replace(['<?xml version="1.0"?>', '<?xml version="1.0" encoding="UTF-8"?>'], '', $content);
-        Validator::isValid($content, $this->xsdpath . "/servico_enviar_lote_rps_envio_v03.xsd");
+        if ($layout === self::LAYOUT_LEGACY) {
+            Validator::isValid($content, $this->xsdpath . "/servico_enviar_lote_rps_envio_v03.xsd");
+        }
         return $this->send($content, $operation);
+    }
+
+    /**
+     * Normalize and validate layout parameter
+     * @param string $layout
+     * @return string
+     */
+    protected function normalizeLayout($layout)
+    {
+        $layout = strtolower((string)$layout);
+        if (empty($layout)) {
+            $layout = self::LAYOUT_LEGACY;
+        }
+        $allowed = [
+            self::LAYOUT_LEGACY,
+            self::LAYOUT_IBSCBS
+        ];
+        if (!in_array($layout, $allowed, true)) {
+            throw new \InvalidArgumentException(
+                'Layout inválido. Utilize "legacy" ou "ibscbs".'
+            );
+        }
+        return $layout;
     }
 
     /**

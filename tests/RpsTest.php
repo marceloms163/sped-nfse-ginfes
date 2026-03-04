@@ -89,6 +89,24 @@ class RpsTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function testRenderIbsCbsLayout()
+    {
+        $std = unserialize(serialize($this->std));
+        $std->Servico->IBSCBS = new \stdClass();
+        $std->Servico->IBSCBS->cIndOp = 1;
+        $std->Servico->IBSCBS->indDest = 1;
+        $std->Servico->IBSCBS->vBC = 100.00;
+        $std->Servico->IBSCBS->vCBS = 1.00;
+        $std->Servico->IBSCBS->vIBS = 2.00;
+
+        $rps = new Rps($std);
+        $xml = $rps->render(null, ['layout' => 'ibscbs']);
+
+        $this->assertStringContainsString('<tipos:IBSCBS>', $xml);
+        $this->assertStringContainsString('<tipos:cIndOp>1</tipos:cIndOp>', $xml);
+        $this->assertStringContainsString('<tipos:vIBS>2</tipos:vIBS>', $xml);
+    }
+
     public function testInterfaceImplementation()
     {
         $class = new ReflectionClass(Rps::class);

@@ -22,7 +22,8 @@ interface RpsInterface
     /**
      * Convert Rps::class data in XML
      * @param stdClass $rps
+     * @param array $options
      * @return string
      */
-    public function render(stdClass $rps = null);
+    public function render(stdClass $rps = null, array $options = []);
 }

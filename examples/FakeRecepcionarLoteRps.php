@@ -109,7 +109,10 @@ try {
     $arps[] = new Rps($std);
 
     $lote = time();
-    $response = $tools->recepcionarLoteRps($arps, $lote);
+    // Layouts:
+    // - legacy (padrao atual, com validacao XSD antiga)
+    // - ibscbs (novo layout com campos IBS/CBS)
+    $response = $tools->recepcionarLoteRps($arps, $lote, 'legacy');
 
     echo FakePretty::prettyPrint($response, '');
 

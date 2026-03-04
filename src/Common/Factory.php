@@ -21,6 +21,8 @@ use stdClass;
 
 class Factory
 {
+    const LAYOUT_LEGACY = 'legacy';
+    const LAYOUT_IBSCBS = 'ibscbs';
 
     /**
      * @var stdClass
@@ -41,6 +43,7 @@ class Factory
      * @var \stdClass
      */
     protected $config;
+    protected $layout = self::LAYOUT_LEGACY;
 
     /**
      * Constructor
@@ -63,6 +66,17 @@ class Factory
     public function addConfig($config)
     {
         $this->config = $config;
+    }
+
+    /**
+     * Add render options
+     * @param array $options
+     */
+    public function setOptions(array $options = [])
+    {
+        if (!empty($options['layout'])) {
+            $this->layout = strtolower((string)$options['layout']);
+        }
     }
 
     /**
@@ -354,6 +368,59 @@ class Factory
             $serv->codigomunicipio,
             true
         );
+        $this->addIbsCbs($node, $serv);
+        $parent->appendChild($node);
+    }
+
+    /**
+     * Includes IBSCBS TAG in Servico node for layouts that support it
+     * @param DOMNode $parent
+     * @param stdClass $serv
+     * @return void
+     */
+    protected function addIbsCbs(&$parent, $serv)
+    {
+        if ($this->layout !== self::LAYOUT_IBSCBS || empty($serv->ibscbs)) {
+            return;
+        }
+        $ibscbs = $serv->ibscbs;
+        $node = $this->dom->createElement('tipos:IBSCBS');
+        $tags = [
+            'cindop' => 'cIndOp',
+            'inddest' => 'indDest',
+            'indfinal' => 'indFinal',
+            'tpoper' => 'tpOper',
+            'refnfse' => 'refNFSe',
+            'indzfmalc' => 'indZFMALC',
+            'cclasstrib' => 'cClassTrib',
+            'clocalidadeincid' => 'cLocalidadeIncid',
+            'predutor' => 'pRedutor',
+            'codigonbs' => 'CodigoNbs',
+            'vbc' => 'vBC',
+            'vcbs' => 'vCBS',
+            'vibs' => 'vIBS',
+            'vtribfed' => 'vTribFed'
+        ];
+        foreach ($tags as $prop => $tag) {
+            if (isset($ibscbs->$prop)) {
+                $this->dom->addChild($node, "tipos:$tag", $ibscbs->$prop, false);
+            }
+        }
+        if (!empty($ibscbs->tributosfederais)) {
+            $trib = $this->dom->createElement('tipos:TributosFederais');
+            $tributosFederaisTags = [
+                'tpretpiscofins' => 'tpRetPisCofins',
+                'vpis' => 'vPis',
+                'vcofins' => 'vCofins',
+                'vtribfed' => 'vTribFed'
+            ];
+            foreach ($tributosFederaisTags as $prop => $tag) {
+                if (isset($ibscbs->tributosfederais->$prop)) {
+                    $this->dom->addChild($trib, "tipos:$tag", $ibscbs->tributosfederais->$prop, false);
+                }
+            }
+            $node->appendChild($trib);
+        }
         $parent->appendChild($node);
     }
 
