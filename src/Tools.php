@@ -89,49 +89,6 @@ class Tools extends BaseTools
     }
 
     /**
-     * Envia um XML v03 já montado/assinado usando a operação sem sufixo.
-     * Alguns provedores expõem o layout v03 atrás do método legado
-     * "RecepcionarLoteRps", mas aceitam apenas um payload no SOAP body.
-     *
-     * @param string $content
-     * @param bool $validateSchema
-     * @return string
-     * @throws \Exception
-     */
-    public function recepcionarLoteRpsV3CompatRaw($content, $validateSchema = true)
-    {
-        $operation = 'RecepcionarLoteRps';
-        $content = str_replace(['<?xml version="1.0"?>', '<?xml version="1.0" encoding="UTF-8"?>'], '', $content);
-        $this->lastMessage = $content;
-        if ($validateSchema) {
-            Validator::isValid($content, $this->xsdpath . "/servico_enviar_lote_rps_envio_v03.xsd");
-        }
-        $this->setVersion("2");
-        return $this->send($content, $operation);
-    }
-
-    /**
-     * Envia LOTE de RPS para emissão de NFSe no layout legado v2.
-     * O XML já deve vir montado e assinado no formato do schema v02.
-     *
-     * @param string $content
-     * @param bool $validateSchema
-     * @return string
-     * @throws \Exception
-     */
-    public function recepcionarLoteRpsV2Raw($content, $validateSchema = true)
-    {
-        $operation = 'RecepcionarLoteRps';
-        $content = str_replace(['<?xml version="1.0"?>', '<?xml version="1.0" encoding="UTF-8"?>'], '', $content);
-        $this->lastMessage = $content;
-        if ($validateSchema) {
-            Validator::isValid($content, $this->xsdpath . "/servico_enviar_lote_rps_envio_v02.xsd");
-        }
-        $this->setVersion("2");
-        return $this->send($content, $operation);
-    }
-
-    /**
      * Normalize and validate layout parameter
      * @param string $layout
      * @return string
