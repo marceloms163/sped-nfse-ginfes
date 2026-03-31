@@ -322,7 +322,7 @@ class Factory
         $this->dom->addChild(
             $valnode,
             "tipos:ValorLiquidoNfse",
-            isset($val->valorliquidonfse) ? $val->valorliquidonfse : null,
+            isset($val->valorliquidonfse) ? number_format($val->valorliquidonfse, 2, '.', '') : null,
             true
         );
         $this->dom->addChild(
@@ -337,6 +337,7 @@ class Factory
             isset($val->descontocondicionado) ? number_format($val->descontocondicionado, 2, '.', '') : null,
             false
         );
+        $this->addIbsCbs($valnode, $serv, $val);
         $node->appendChild($valnode);
         $this->dom->addChild(
             $node,
@@ -368,7 +369,12 @@ class Factory
             $serv->codigomunicipio,
             true
         );
-        $this->addIbsCbs($node, $serv);
+        $this->dom->addChild(
+            $node,
+            "tipos:CodigoNbs",
+            isset($serv->codigonbs) ? (string)$serv->codigonbs : '0',
+            true
+        );
         $parent->appendChild($node);
     }
 
@@ -376,51 +382,164 @@ class Factory
      * Includes IBSCBS TAG in Servico node for layouts that support it
      * @param DOMNode $parent
      * @param stdClass $serv
+     * @param stdClass $val
      * @return void
      */
-    protected function addIbsCbs(&$parent, $serv)
+    protected function addIbsCbs(&$parent, $serv, $val)
     {
         if ($this->layout !== self::LAYOUT_IBSCBS || empty($serv->ibscbs)) {
             return;
         }
         $ibscbs = $serv->ibscbs;
+
+        $trib = $this->dom->createElement('tipos:trib');
+        if (!empty($val->tribfed) && !empty($val->tribfed->piscofins)) {
+            $tribFed = $this->dom->createElement('tipos:tribFed');
+            $piscofins = $this->dom->createElement('tipos:piscofins');
+            $pisCofinsData = $val->tribfed->piscofins;
+            $this->dom->addChild(
+                $piscofins,
+                "tipos:CST",
+                str_pad($pisCofinsData->cst, 2, '0', STR_PAD_LEFT),
+                true
+            );
+            $this->dom->addChild(
+                $piscofins,
+                "tipos:vBCPisCofins",
+                isset($pisCofinsData->vbcpiscofins)
+                    ? number_format($pisCofinsData->vbcpiscofins, 2, '.', '')
+                    : null,
+                false
+            );
+            $this->dom->addChild(
+                $piscofins,
+                "tipos:pAliqPis",
+                isset($pisCofinsData->paliqpis)
+                    ? number_format($pisCofinsData->paliqpis, 2, '.', '')
+                    : null,
+                false
+            );
+            $this->dom->addChild(
+                $piscofins,
+                "tipos:pAliqCofins",
+                isset($pisCofinsData->paliqcofins)
+                    ? number_format($pisCofinsData->paliqcofins, 2, '.', '')
+                    : null,
+                false
+            );
+            $this->dom->addChild(
+                $piscofins,
+                "tipos:vPis",
+                isset($pisCofinsData->vpis)
+                    ? number_format($pisCofinsData->vpis, 2, '.', '')
+                    : null,
+                false
+            );
+            $this->dom->addChild(
+                $piscofins,
+                "tipos:vCofins",
+                isset($pisCofinsData->vcofins)
+                    ? number_format($pisCofinsData->vcofins, 2, '.', '')
+                    : null,
+                false
+            );
+            $this->dom->addChild(
+                $piscofins,
+                "tipos:tpRetPisCofins",
+                isset($pisCofinsData->tpretpiscofins) ? $pisCofinsData->tpretpiscofins : null,
+                false
+            );
+            $tribFed->appendChild($piscofins);
+            $trib->appendChild($tribFed);
+        }
+        $totTrib = $this->dom->createElement('tipos:totTrib');
+        $pTotTrib = $this->dom->createElement('tipos:pTotTrib');
+        $this->dom->addChild(
+            $pTotTrib,
+            "tipos:pTotTribFed",
+            isset($ibscbs->ptottribfed)
+                ? number_format((float) $ibscbs->ptottribfed, 2, '.', '')
+                : '0.00',
+            true
+        );
+        $this->dom->addChild(
+            $pTotTrib,
+            "tipos:pTotTribEst",
+            isset($ibscbs->ptottribest)
+                ? number_format((float) $ibscbs->ptottribest, 2, '.', '')
+                : '0.00',
+            true
+        );
+        $this->dom->addChild(
+            $pTotTrib,
+            "tipos:pTotTribMun",
+            isset($ibscbs->ptottribmun)
+                ? number_format((float) $ibscbs->ptottribmun, 2, '.', '')
+                : '0.00',
+            true
+        );
+        $totTrib->appendChild($pTotTrib);
+        $trib->appendChild($totTrib);
+        $parent->appendChild($trib);
+
         $node = $this->dom->createElement('tipos:IBSCBS');
-        $tags = [
-            'cindop' => 'cIndOp',
-            'inddest' => 'indDest',
-            'indfinal' => 'indFinal',
-            'tpoper' => 'tpOper',
-            'refnfse' => 'refNFSe',
-            'indzfmalc' => 'indZFMALC',
-            'cclasstrib' => 'cClassTrib',
-            'clocalidadeincid' => 'cLocalidadeIncid',
-            'predutor' => 'pRedutor',
-            'codigonbs' => 'CodigoNbs',
-            'vbc' => 'vBC',
-            'vcbs' => 'vCBS',
-            'vibs' => 'vIBS',
-            'vtribfed' => 'vTribFed'
-        ];
-        foreach ($tags as $prop => $tag) {
-            if (isset($ibscbs->$prop)) {
-                $this->dom->addChild($node, "tipos:$tag", $ibscbs->$prop, false);
-            }
-        }
-        if (!empty($ibscbs->tributosfederais)) {
-            $trib = $this->dom->createElement('tipos:TributosFederais');
-            $tributosFederaisTags = [
-                'tpretpiscofins' => 'tpRetPisCofins',
-                'vpis' => 'vPis',
-                'vcofins' => 'vCofins',
-                'vtribfed' => 'vTribFed'
-            ];
-            foreach ($tributosFederaisTags as $prop => $tag) {
-                if (isset($ibscbs->tributosfederais->$prop)) {
-                    $this->dom->addChild($trib, "tipos:$tag", $ibscbs->tributosfederais->$prop, false);
-                }
-            }
-            $node->appendChild($trib);
-        }
+        $this->dom->addChild(
+            $node,
+            "tipos:finNFSe",
+            isset($ibscbs->finnfse) ? $ibscbs->finnfse : '0',
+            true
+        );
+        $this->dom->addChild(
+            $node,
+            "tipos:indFinal",
+            isset($ibscbs->indfinal) ? $ibscbs->indfinal : '0',
+            true
+        );
+        $this->dom->addChild(
+            $node,
+            "tipos:cIndOp",
+            isset($ibscbs->cindop) ? str_pad($ibscbs->cindop, 6, '0', STR_PAD_LEFT) : '100101',
+            true
+        );
+        $this->dom->addChild(
+            $node,
+            "tipos:indDest",
+            isset($ibscbs->inddest) ? $ibscbs->inddest : '0',
+            true
+        );
+
+        $valores = $this->dom->createElement('tipos:valores');
+        $tribIbsCbs = $this->dom->createElement('tipos:trib');
+        $gIBSCBS = $this->dom->createElement('tipos:gIBSCBS');
+        $this->dom->addChild(
+            $gIBSCBS,
+            "tipos:CST",
+            isset($ibscbs->cst) ? str_pad($ibscbs->cst, 3, '0', STR_PAD_LEFT) : '000',
+            true
+        );
+        $this->dom->addChild(
+            $gIBSCBS,
+            "tipos:cClassTrib",
+            isset($ibscbs->cclasstrib) ? str_pad($ibscbs->cclasstrib, 6, '0', STR_PAD_LEFT) : '000000',
+            true
+        );
+        $tribIbsCbs->appendChild($gIBSCBS);
+        $valores->appendChild($tribIbsCbs);
+        $this->dom->addChild(
+            $valores,
+            "tipos:cLocalidadeIncid",
+            isset($ibscbs->clocalidadeincid) ? $ibscbs->clocalidadeincid : $serv->codigomunicipio,
+            true
+        );
+        $this->dom->addChild(
+            $valores,
+            "tipos:pRedutor",
+            isset($ibscbs->predutor)
+                ? number_format((float) $ibscbs->predutor, 2, '.', '')
+                : '0.00',
+            true
+        );
+        $node->appendChild($valores);
         $parent->appendChild($node);
     }
 

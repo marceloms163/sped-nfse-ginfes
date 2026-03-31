@@ -46,7 +46,7 @@ class Tools extends BaseTools
      * @return string
      * @throws \Exception
      */
-    public function recepcionarLoteRps($arps, $lote, $layout = self::LAYOUT_LEGACY)
+    public function recepcionarLoteRps($arps, $lote, $layout = self::LAYOUT_LEGACY, $validateSchema = true)
     {
         $operation = 'RecepcionarLoteRpsV3';
         $layout = $this->normalizeLayout($layout);
@@ -81,9 +81,53 @@ class Tools extends BaseTools
             'EnviarLoteRpsEnvio'
         );
         $content = str_replace(['<?xml version="1.0"?>', '<?xml version="1.0" encoding="UTF-8"?>'], '', $content);
-        if ($layout === self::LAYOUT_LEGACY) {
+        $this->lastMessage = $content;
+        if ($validateSchema) {
             Validator::isValid($content, $this->xsdpath . "/servico_enviar_lote_rps_envio_v03.xsd");
         }
+        return $this->send($content, $operation);
+    }
+
+    /**
+     * Envia um XML v03 já montado/assinado usando a operação sem sufixo.
+     * Alguns provedores expõem o layout v03 atrás do método legado
+     * "RecepcionarLoteRps", mas aceitam apenas um payload no SOAP body.
+     *
+     * @param string $content
+     * @param bool $validateSchema
+     * @return string
+     * @throws \Exception
+     */
+    public function recepcionarLoteRpsV3CompatRaw($content, $validateSchema = true)
+    {
+        $operation = 'RecepcionarLoteRps';
+        $content = str_replace(['<?xml version="1.0"?>', '<?xml version="1.0" encoding="UTF-8"?>'], '', $content);
+        $this->lastMessage = $content;
+        if ($validateSchema) {
+            Validator::isValid($content, $this->xsdpath . "/servico_enviar_lote_rps_envio_v03.xsd");
+        }
+        $this->setVersion("2");
+        return $this->send($content, $operation);
+    }
+
+    /**
+     * Envia LOTE de RPS para emissão de NFSe no layout legado v2.
+     * O XML já deve vir montado e assinado no formato do schema v02.
+     *
+     * @param string $content
+     * @param bool $validateSchema
+     * @return string
+     * @throws \Exception
+     */
+    public function recepcionarLoteRpsV2Raw($content, $validateSchema = true)
+    {
+        $operation = 'RecepcionarLoteRps';
+        $content = str_replace(['<?xml version="1.0"?>', '<?xml version="1.0" encoding="UTF-8"?>'], '', $content);
+        $this->lastMessage = $content;
+        if ($validateSchema) {
+            Validator::isValid($content, $this->xsdpath . "/servico_enviar_lote_rps_envio_v02.xsd");
+        }
+        $this->setVersion("2");
         return $this->send($content, $operation);
     }
 
@@ -183,6 +227,73 @@ class Tools extends BaseTools
         );
         $content = str_replace(['<?xml version="1.0"?>', '<?xml version="1.0" encoding="UTF-8"?>'], '', $content);
         Validator::isValid($content, $this->xsdpath . '/servico_consultar_lote_rps_envio_v03.xsd');
+        return $this->send($content, $operation);
+    }
+
+    /**
+     * Consulta de lote usando operação sem sufixo, com payload único
+     * no SOAP body e XML interno no schema v03.
+     *
+     * @param string $protocolo
+     * @return string
+     */
+    public function consultarLoteRpsV3Compat($protocolo)
+    {
+        $operation = "ConsultarLoteRps";
+        $content = "<ConsultarLoteRpsEnvio "
+            . "xmlns:tipos=\"http://www.ginfes.com.br/tipos_v03.xsd\" "
+            . "xmlns=\"http://www.ginfes.com.br/servico_consultar_lote_rps_envio_v03.xsd\">"
+            . "<Prestador>"
+            . "<tipos:Cnpj>" . $this->config->cnpj . "</tipos:Cnpj>"
+            . "<tipos:InscricaoMunicipal>" . $this->config->im . "</tipos:InscricaoMunicipal>"
+            . "</Prestador>"
+            . "<Protocolo>$protocolo</Protocolo>"
+            . "</ConsultarLoteRpsEnvio>";
+
+        $content = Signer::sign(
+            $this->certificate,
+            $content,
+            'ConsultarLoteRpsEnvio',
+            '',
+            OPENSSL_ALGO_SHA1,
+            [false, false, null, null]
+        );
+        $content = str_replace(['<?xml version="1.0"?>', '<?xml version="1.0" encoding="UTF-8"?>'], '', $content);
+        Validator::isValid($content, $this->xsdpath . '/servico_consultar_lote_rps_envio_v03.xsd');
+        $this->setVersion("2");
+        return $this->send($content, $operation);
+    }
+
+    /**
+     * Consulta Lote RPS no layout legado v2.
+     *
+     * @param string $protocolo
+     * @return string
+     */
+    public function consultarLoteRpsV2($protocolo)
+    {
+        $operation = "ConsultarLoteRps";
+        $content = "<ConsultarLoteRpsEnvio "
+            . "xmlns=\"http://www.ginfes.com.br/servico_consultar_lote_rps_envio\" "
+            . "xmlns:tipos=\"http://www.ginfes.com.br/tipos\">"
+            . "<Prestador>"
+            . "<tipos:Cnpj>" . $this->config->cnpj . "</tipos:Cnpj>"
+            . "<tipos:InscricaoMunicipal>" . $this->config->im . "</tipos:InscricaoMunicipal>"
+            . "</Prestador>"
+            . "<Protocolo>$protocolo</Protocolo>"
+            . "</ConsultarLoteRpsEnvio>";
+
+        $content = Signer::sign(
+            $this->certificate,
+            $content,
+            'ConsultarLoteRpsEnvio',
+            '',
+            OPENSSL_ALGO_SHA1,
+            [false, false, null, null]
+        );
+        $content = str_replace(['<?xml version="1.0"?>', '<?xml version="1.0" encoding="UTF-8"?>'], '', $content);
+        Validator::isValid($content, $this->xsdpath . '/servico_consultar_lote_rps_envio_v02.xsd');
+        $this->setVersion("2");
         return $this->send($content, $operation);
     }
 

@@ -24,6 +24,16 @@ use Psr\Log\LoggerInterface;
 class SoapCurl extends SoapBase implements SoapInterface
 {
     /**
+     * Hosts com stack TLS legado que exigem fallback via openssl CLI.
+     * Hoje SBC/GissOnline é o principal caso conhecido.
+     *
+     * @var string[]
+     */
+    private $legacyRenegotiationHosts = [
+        'isssbc.com.br'
+    ];
+
+    /**
      * Constructor
      * @param Certificate $certificate
      * @param LoggerInterface $logger
@@ -92,6 +102,15 @@ class SoapCurl extends SoapBase implements SoapInterface
             }
             $headsize = curl_getinfo($oCurl, CURLINFO_HEADER_SIZE);
             $httpcode = curl_getinfo($oCurl, CURLINFO_HTTP_CODE);
+            if ($this->mustUseLegacyRenegotiationFallback($url, $this->soaperror, $soapessor_code)) {
+                curl_close($oCurl);
+                return $this->sendWithOpenSslLegacyRenegotiation(
+                    $operation,
+                    $url,
+                    $envelope,
+                    $parameters
+                );
+            }
             curl_close($oCurl);
             $this->responseHead = trim(substr($response, 0, $headsize));
             $this->responseBody = trim(substr($response, $headsize));
@@ -110,6 +129,131 @@ class SoapCurl extends SoapBase implements SoapInterface
             );
         }
         if ($httpcode != 200) {
+            throw SoapException::soapFault(
+                " [$url] HTTP Error code: $httpcode - "
+                    . $this->getFaultString($this->responseBody),
+                $httpcode
+            );
+        }
+        return $this->responseBody;
+    }
+
+    /**
+     * Detecta erro de renegociação TLS insegura, comum em stacks legados.
+     *
+     * @param string $url
+     * @param string $soapError
+     * @param int $soapErrorCode
+     * @return bool
+     */
+    private function mustUseLegacyRenegotiationFallback($url, $soapError, $soapErrorCode)
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (empty($host)) {
+            return false;
+        }
+        $legacyHost = false;
+        foreach ($this->legacyRenegotiationHosts as $suffix) {
+            if ($host === $suffix || substr($host, -strlen('.' . $suffix)) === '.' . $suffix) {
+                $legacyHost = true;
+                break;
+            }
+        }
+        if (!$legacyHost) {
+            return false;
+        }
+        if ((int)$soapErrorCode !== 35 && stripos((string)$soapError, 'unsafe legacy renegotiation') === false) {
+            return false;
+        }
+        return function_exists('proc_open');
+    }
+
+    /**
+     * Fallback de transporte usando openssl CLI para endpoints com TLS legado.
+     *
+     * @param string $operation
+     * @param string $url
+     * @param string $envelope
+     * @param array $parameters
+     * @return string
+     * @throws SoapException
+     */
+    private function sendWithOpenSslLegacyRenegotiation(
+        $operation,
+        $url,
+        $envelope,
+        array $parameters
+    ) {
+        $parts = parse_url($url);
+        if (empty($parts['host'])) {
+            throw SoapException::soapFault("URL inválida para fallback openssl [$url]");
+        }
+        $host = $parts['host'];
+        $port = !empty($parts['port']) ? (int)$parts['port'] : 443;
+        $path = !empty($parts['path']) ? $parts['path'] : '/';
+        if (!empty($parts['query'])) {
+            $path .= '?' . $parts['query'];
+        }
+        $request = "POST {$path} HTTP/1.1\r\n"
+            . "Host: {$host}\r\n"
+            . implode("\r\n", $parameters) . "\r\n"
+            . "Connection: close\r\n\r\n"
+            . $envelope;
+
+        $command = 'openssl s_client'
+            . ' -quiet -ign_eof -legacy_renegotiation'
+            . ' -connect ' . escapeshellarg($host . ':' . $port)
+            . ' -servername ' . escapeshellarg($host)
+            . ' -cert ' . escapeshellarg($this->tempdir . $this->certfile)
+            . ' -key ' . escapeshellarg($this->tempdir . $this->prifile);
+        if (!empty($this->temppass)) {
+            $command .= ' -pass ' . escapeshellarg('pass:' . $this->temppass);
+        }
+
+        $descriptorspec = [
+            0 => ['pipe', 'w'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w']
+        ];
+        $process = proc_open($command, $descriptorspec, $pipes);
+        if (!is_resource($process)) {
+            throw SoapException::soapFault("Não foi possível iniciar fallback openssl [$url]");
+        }
+        fwrite($pipes[0], $request);
+        fclose($pipes[0]);
+        $response = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($process);
+
+        if ($exitCode !== 0 && empty($response)) {
+            throw SoapException::soapFault(
+                trim("Fallback openssl falhou [{$url}] {$stderr}"),
+                $exitCode
+            );
+        }
+
+        $response = ltrim((string)$response);
+        $parts = preg_split("/\r\n\r\n|\n\n/", $response, 2);
+        $this->responseHead = trim($parts[0] ?? '');
+        $this->responseBody = trim($parts[1] ?? '');
+        $this->soaperror = '';
+        $this->soapinfo = [
+            'fallback' => 'openssl-legacy-renegotiation',
+            'stderr' => trim($stderr)
+        ];
+        $this->saveDebugFiles(
+            $operation,
+            $this->requestHead . "\n" . $this->requestBody,
+            $this->responseHead . "\n" . $this->responseBody
+        );
+
+        $httpcode = 0;
+        if (preg_match('/^HTTP\/\d+(?:\.\d+)?\s+(\d+)/', $this->responseHead, $matches)) {
+            $httpcode = (int)$matches[1];
+        }
+        if ($httpcode !== 200) {
             throw SoapException::soapFault(
                 " [$url] HTTP Error code: $httpcode - "
                     . $this->getFaultString($this->responseBody),

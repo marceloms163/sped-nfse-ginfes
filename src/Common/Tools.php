@@ -23,6 +23,7 @@ use NFePHP\NFSeGinfes\Common\Soap\SoapInterface;
 class Tools
 {
     public $lastRequest;
+    public $lastMessage;
 
     protected $config;
     protected $prestador;
@@ -61,7 +62,21 @@ class Tools
         if (empty($urls[$cmun])) {
             throw new \Exception("Não localizado parâmetros para esse municipio.");
         }
-        return (object)$urls[$cmun];
+        $wsobj = $urls[$cmun];
+        $overrides = [
+            'homologacao' => 'ws_homologacao',
+            'producao' => 'ws_producao',
+            'homologacao_soapns' => 'ws_homologacao_soapns',
+            'producao_soapns' => 'ws_producao_soapns',
+            'version' => 'ws_version',
+            'cabecalho_namespace' => 'ws_cabecalho_namespace'
+        ];
+        foreach ($overrides as $target => $source) {
+            if (!empty($this->config->$source)) {
+                $wsobj[$target] = $this->config->$source;
+            }
+        }
+        return (object)$wsobj;
     }
 
 
@@ -166,8 +181,11 @@ class Tools
      */
     protected function createSoapRequest($message, $operation)
     {
+        $cabecalhoNamespace = !empty($this->wsobj->cabecalho_namespace)
+            ? $this->wsobj->cabecalho_namespace
+            : "http://www.ginfes.com.br/cabecalho_v03.xsd";
         $cabecalho = "<ns2:cabecalho versao=\"{$this->wsobj->version}\" "
-            . "xmlns:ns2=\"http://www.ginfes.com.br/cabecalho_v03.xsd\">"
+            . "xmlns:ns2=\"{$cabecalhoNamespace}\">"
             . "<versaoDados>{$this->wsobj->version}</versaoDados>"
             . "</ns2:cabecalho>";
 
