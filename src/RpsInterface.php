@@ -25,5 +25,5 @@ interface RpsInterface
      * @param array $options
      * @return string
      */
-    public function render(stdClass $rps = null, array $options = []);
+    public function render(?stdClass $rps = null, array $options = []);
 }

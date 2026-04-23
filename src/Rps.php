@@ -43,7 +43,7 @@ class Rps implements RpsInterface
      * Constructor
      * @param stdClass $rps
      */
-    public function __construct(stdClass $rps = null)
+    public function __construct(?stdClass $rps = null)
     {
         $this->init($rps);
     }
@@ -60,7 +60,7 @@ class Rps implements RpsInterface
     /**
      * {@inheritdoc}
      */
-    public function render(stdClass $rps = null, array $options = [])
+    public function render(?stdClass $rps = null, array $options = [])
     {
         $this->init($rps);
         $fac = new Factory($this->std);
@@ -75,7 +75,7 @@ class Rps implements RpsInterface
      * Inicialize properties and valid input
      * @param stdClass $rps
      */
-    private function init(stdClass $rps = null)
+    private function init(?stdClass $rps = null)
     {
         if (!empty($rps)) {
             $this->std = $this->propertiesToLower($rps);
